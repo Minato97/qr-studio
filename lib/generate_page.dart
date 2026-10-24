@@ -21,6 +21,31 @@ extension on QrKind {
       };
 }
 
+IconData _kindIcon(QrKind k) => switch (k) {
+      QrKind.text => Icons.link,
+      QrKind.wifi => Icons.wifi,
+      QrKind.phone => Icons.phone,
+      QrKind.email => Icons.mail,
+    };
+
+const _qrColors = <Color>[
+  Color(0xFF111827),
+  Color(0xFF4F46E5),
+  Color(0xFF0D9488),
+  Color(0xFFE11D48),
+  Color(0xFFEA580C),
+  Color(0xFF7C3AED),
+];
+
+InputDecoration _fieldDec(String label) => InputDecoration(
+      labelText: label,
+      filled: true,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+    );
+
 String _escapeWifi(String s) =>
     s.replaceAllMapped(RegExp(r'([\\;,:"])'), (m) => '\\${m[1]}');
 
@@ -38,6 +63,8 @@ class _GeneratePageState extends State<GeneratePage> {
   QrKind _kind = QrKind.text;
   String _wifiSecurity = 'WPA';
   String? _data;
+  int _color = 0;
+  bool _rounded = true;
 
   @override
   void dispose() {
@@ -94,14 +121,43 @@ class _GeneratePageState extends State<GeneratePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final qrColor = _qrColors[_color];
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+            ),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.qr_code_2, color: Colors.white, size: 40),
+              SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Crea códigos QR de enlaces, WiFi, teléfonos y correos en segundos.',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         Wrap(
           spacing: 8,
+          runSpacing: 4,
           children: [
             for (final k in QrKind.values)
               ChoiceChip(
+                avatar: Icon(_kindIcon(k), size: 18),
                 label: Text(k.label),
                 selected: _kind == k,
                 onSelected: (_) => setState(() {
@@ -122,21 +178,15 @@ class _GeneratePageState extends State<GeneratePage> {
                   ? TextInputType.emailAddress
                   : TextInputType.text,
           maxLines: _kind == QrKind.text ? 3 : 1,
-          decoration: InputDecoration(
-              labelText: _mainLabel, border: const OutlineInputBorder()),
+          decoration: _fieldDec(_mainLabel),
         ),
         if (_kind == QrKind.wifi) ...[
           const SizedBox(height: 12),
-          TextField(
-            controller: _extra,
-            decoration: const InputDecoration(
-                labelText: 'Contraseña', border: OutlineInputBorder()),
-          ),
+          TextField(controller: _extra, decoration: _fieldDec('Contraseña')),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: _wifiSecurity,
-            decoration: const InputDecoration(
-                labelText: 'Seguridad', border: OutlineInputBorder()),
+            decoration: _fieldDec('Seguridad'),
             items: const [
               DropdownMenuItem(value: 'WPA', child: Text('WPA/WPA2')),
               DropdownMenuItem(value: 'WEP', child: Text('WEP')),
@@ -146,25 +196,96 @@ class _GeneratePageState extends State<GeneratePage> {
           ),
         ],
         const SizedBox(height: 16),
+        Text('Estilo', style: theme.textTheme.titleSmall),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            for (var i = 0; i < _qrColors.length; i++)
+              GestureDetector(
+                onTap: () => setState(() => _color = i),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(
+                    color: _qrColors[i],
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _color == i
+                          ? theme.colorScheme.primary
+                          : Colors.transparent,
+                      width: 3,
+                    ),
+                  ),
+                ),
+              ),
+            const Spacer(),
+            FilterChip(
+              label: const Text('Redondeado'),
+              selected: _rounded,
+              onSelected: (v) => setState(() => _rounded = v),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
         FilledButton.icon(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+          ),
           onPressed: _generate,
-          icon: const Icon(Icons.qr_code_2),
+          icon: const Icon(Icons.auto_awesome),
           label: const Text('Generar código QR'),
         ),
         if (_data != null) ...[
           const SizedBox(height: 24),
           Center(
-            child: RepaintBoundary(
-              key: _qrKey,
-              child: Container(
-                color: Colors.white,
-                padding: const EdgeInsets.all(16),
-                child: QrImageView(data: _data!, size: 240),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: qrColor.withValues(alpha: 0.25),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: RepaintBoundary(
+                  key: _qrKey,
+                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(20),
+                    child: QrImageView(
+                      data: _data!,
+                      size: 240,
+                      eyeStyle: QrEyeStyle(
+                        eyeShape:
+                            _rounded ? QrEyeShape.circle : QrEyeShape.square,
+                        color: qrColor,
+                      ),
+                      dataModuleStyle: QrDataModuleStyle(
+                        dataModuleShape: _rounded
+                            ? QrDataModuleShape.circle
+                            : QrDataModuleShape.square,
+                        color: qrColor,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
           const SizedBox(height: 16),
-          OutlinedButton.icon(
+          FilledButton.tonalIcon(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
             onPressed: _share,
             icon: const Icon(Icons.share),
             label: const Text('Compartir imagen'),
